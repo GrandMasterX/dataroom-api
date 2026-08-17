@@ -355,6 +355,66 @@ describe('sharing', () => {
     });
   });
 
+  describe('search', () => {
+    it('is confined to the shared subtree', async () => {
+      // Search is addressed by node, so the boundary is the item the caller may see. A guest
+      // cannot widen it by changing a parameter, and there is no separate guest rule to keep
+      // in step with the owner's.
+      // Mutation: scope the query by data room instead of by node path -> the second
+      // assertion finds the file and this fails.
+      const owner = await signUp('owner');
+      const tree = await buildRoom(owner.token);
+      const ownerAuth = { Authorization: `Bearer ${owner.token}` };
+
+      await http()
+        .post('/nodes/folders')
+        .set(ownerAuth)
+        .send({ parentId: tree.ndasId, name: 'Beacon NDA drafts' })
+        .expect(201);
+      await http()
+        .post('/nodes/folders')
+        .set(ownerAuth)
+        .send({ parentId: tree.financialsId, name: 'Beacon revenue model' })
+        .expect(201);
+
+      const link = await http()
+        .post(`/nodes/${tree.legalId}/shares/link`)
+        .set(ownerAuth)
+        .send({})
+        .expect(200);
+      const guest = { 'X-Share-Token': link.body.token as string };
+
+      const owned = await http()
+        .get(`/nodes/${tree.rootNodeId}/search?q=beacon`)
+        .set(ownerAuth)
+        .expect(200);
+      expect(owned.body.map((hit: { name: string }) => hit.name).sort()).toEqual([
+        'Beacon NDA drafts',
+        'Beacon revenue model',
+      ]);
+
+      const shared = await http()
+        .get(`/nodes/${tree.legalId}/search?q=beacon`)
+        .set(guest)
+        .expect(200);
+      expect(shared.body).toHaveLength(1);
+      expect(shared.body[0].name).toBe('Beacon NDA drafts');
+      // Nothing from outside the share leaks through the result's context either.
+      expect(JSON.stringify(shared.body)).not.toContain('02 Financials');
+    });
+
+    it('refuses a query too short to use the index', async () => {
+      const owner = await signUp('owner');
+      const tree = await buildRoom(owner.token);
+
+      const response = await http()
+        .get(`/nodes/${tree.rootNodeId}/search?q=be`)
+        .set({ Authorization: `Bearer ${owner.token}` })
+        .expect(400);
+      expect(response.body.error.code).toBe('VALIDATION_FAILED');
+    });
+  });
+
   describe('overlapping access', () => {
     it('treats a signed-in visitor holding someone else’s link as a guest there', async () => {
       // Both a session and a token can be present at once; treating them as alternatives

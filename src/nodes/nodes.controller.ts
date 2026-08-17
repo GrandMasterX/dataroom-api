@@ -12,10 +12,13 @@ import {
   NodeDetailDto,
   NodeDto,
   RenameNodeDto,
+  SearchHitDto,
+  SearchQueryDto,
   SubtreeStatsDto,
   listedToNodeDto,
   toCapabilitiesDto,
   toNodeDto,
+  toSearchHitDto,
   toStatsDto,
 } from './dto/node.dto';
 import { NodeTreeService } from './node-tree.service';
@@ -91,6 +94,23 @@ export class NodesController {
   ): Promise<SubtreeStatsDto> {
     const { node } = await this.access.requireRead(ctx, id);
     return toStatsDto(await this.tree.stats(node.id));
+  }
+
+  @Get(':id/search')
+  @ApiOperation({
+    summary: 'Find items by name inside this subtree',
+    description:
+      'Scoped to the node it is called on, so a guest searching a shared folder cannot reach anything outside it — the same endpoint serves both without a separate rule.',
+  })
+  @ApiOkResponse({ type: [SearchHitDto] })
+  async search(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Query() query: SearchQueryDto,
+    @Ctx() ctx: AccessContext,
+  ): Promise<SearchHitDto[]> {
+    const { node } = await this.access.requireRead(ctx, id);
+    const hits = await this.tree.search({ node, query: query.q, limit: query.limit ?? 20 });
+    return hits.map((hit) => toSearchHitDto(hit, node.dataRoomId));
   }
 
   @Post('folders')

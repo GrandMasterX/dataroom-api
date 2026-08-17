@@ -32,6 +32,18 @@ export interface SubtreeStats {
   totalSizeBytes: number;
 }
 
+export interface SearchHit {
+  id: string;
+  name: string;
+  type: NodeType;
+  updatedAt: Date;
+  sizeBytes: number | null;
+  mimeType: string | null;
+  /** The folder it sits in, so a result is meaningful without showing the whole path. */
+  parentId: string | null;
+  parentName: string | null;
+}
+
 export interface ListedNode {
   id: string;
   name: string;
@@ -357,6 +369,50 @@ export class NodeTreeService {
           ? encodeCursor({ type: last.type, nameCi: last.name_ci, id: last.id })
           : undefined,
     };
+  }
+
+  /**
+   * Searches names inside one subtree.
+   *
+   * Scoped to a node rather than to a data room, which makes the same endpoint correct for
+   * an owner searching a whole room and for a guest searching only what was shared with
+   * them — the boundary is the node they are allowed to see, so there is no second rule to
+   * write for guests and no way to widen it by changing a parameter.
+   *
+   * The prefix is a bound parameter: PostgreSQL derives the index range from the value, but
+   * cannot when the pattern is built from a subquery, and that form silently becomes a
+   * sequential scan.
+   *
+   * Queries shorter than three characters are rejected by the caller: fewer characters
+   * produce no complete trigrams, so the GIN index cannot be used and every keystroke would
+   * scan the room.
+   */
+  async search(params: {
+    node: NodeRow;
+    query: string;
+    limit: number;
+  }): Promise<SearchHit[]> {
+    const rows = await this.prisma.$queryRaw<
+      (RawListedNode & { parent_id: string | null; parent_name: string | null })[]
+    >`
+      SELECT n.id, n.name, n.type, n.name_ci, n.updated_at,
+             v.size_bytes, v.mime_type,
+             n.parent_id, p.name AS parent_name
+      FROM nodes n
+      LEFT JOIN file_versions v ON v.node_id = n.id AND v.is_current
+      LEFT JOIN nodes p ON p.id = n.parent_id
+      WHERE n.data_room_id = ${params.node.dataRoomId}::uuid
+        AND n.path LIKE ${`${params.node.path}%`}
+        AND n.id <> ${params.node.id}::uuid
+        AND n.name_ci LIKE '%' || lower(${params.query}) || '%'
+      ORDER BY n.type, n.name_ci, n.id
+      LIMIT ${Math.min(Math.max(params.limit, 1), 50)}`;
+
+    return rows.map((row) => ({
+      ...toListedNode(row),
+      parentId: row.parent_id,
+      parentName: row.parent_name,
+    }));
   }
 
   /**

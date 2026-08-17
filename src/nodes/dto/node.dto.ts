@@ -1,9 +1,19 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
-import { IsIn, IsInt, IsOptional, IsString, IsUUID, Max, MaxLength, Min } from 'class-validator';
+import {
+  IsIn,
+  IsInt,
+  IsOptional,
+  IsString,
+  IsUUID,
+  Max,
+  MaxLength,
+  Min,
+  MinLength,
+} from 'class-validator';
 import { NameRules } from '../../common/validation/name-rules';
 import { can, type Role } from '../../access/permissions';
-import type { ListedNode, NodeRow, SubtreeStats } from '../node-tree.service';
+import type { ListedNode, NodeRow, SearchHit, SubtreeStats } from '../node-tree.service';
 
 export class CreateFolderDto {
   @ApiProperty() @IsUUID() parentId!: string;
@@ -111,6 +121,44 @@ export class ChildrenPageDto {
   nextCursor?: string;
 }
 
+export class SearchQueryDto {
+  @ApiProperty({
+    minLength: 3,
+    description:
+      'At least three characters: shorter queries produce no complete trigrams, so the index cannot serve them and every keystroke would scan the room.',
+  })
+  @IsString()
+  @MinLength(3)
+  @MaxLength(120)
+  q!: string;
+
+  @ApiPropertyOptional({ default: 20, minimum: 1, maximum: 50 })
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(50)
+  limit?: number;
+}
+
+/**
+ * Standalone rather than extending NodeDto: a search result carries the folder it was found
+ * in, and redeclaring an inherited field to add documentation is the kind of subtlety that
+ * makes a generated client harder to read than the extra six lines.
+ */
+export class SearchHitDto {
+  @ApiProperty() id!: string;
+  @ApiProperty() dataRoomId!: string;
+  @ApiProperty({ enum: ['FOLDER', 'FILE'] }) type!: 'FOLDER' | 'FILE';
+  @ApiProperty() name!: string;
+  @ApiProperty() updatedAt!: Date;
+  @ApiPropertyOptional({ nullable: true, type: Number }) sizeBytes?: number | null;
+  @ApiPropertyOptional({ nullable: true, type: String }) mimeType?: string | null;
+  @ApiProperty({ nullable: true, type: String, description: 'The folder this result sits in' })
+  parentId!: string | null;
+  @ApiProperty({ nullable: true, type: String }) parentName!: string | null;
+}
+
 export class SubtreeStatsDto {
   @ApiProperty() folderCount!: number;
   @ApiProperty() fileCount!: number;
@@ -141,6 +189,20 @@ export function listedToNodeDto(item: ListedNode, dataRoomId: string, parentId: 
     updatedAt: item.updatedAt,
     sizeBytes: item.sizeBytes,
     mimeType: item.mimeType,
+  };
+}
+
+export function toSearchHitDto(hit: SearchHit, dataRoomId: string): SearchHitDto {
+  return {
+    id: hit.id,
+    dataRoomId,
+    parentId: hit.parentId,
+    parentName: hit.parentName,
+    type: hit.type,
+    name: hit.name,
+    updatedAt: hit.updatedAt,
+    sizeBytes: hit.sizeBytes,
+    mimeType: hit.mimeType,
   };
 }
 

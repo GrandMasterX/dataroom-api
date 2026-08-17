@@ -332,6 +332,62 @@
         ]
       }
     },
+    "/nodes/{id}/search": {
+      "get": {
+        "description": "Scoped to the node it is called on, so a guest searching a shared folder cannot reach anything outside it — the same endpoint serves both without a separate rule.",
+        "operationId": "NodesController_search",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "q",
+            "required": true,
+            "in": "query",
+            "description": "At least three characters: shorter queries produce no complete trigrams, so the index cannot serve them and every keystroke would scan the room.",
+            "schema": {
+              "minLength": 3,
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 50,
+              "default": 20,
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/SearchHitDto"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "summary": "Find items by name inside this subtree",
+        "tags": [
+          "nodes"
+        ]
+      }
+    },
     "/nodes/folders": {
       "post": {
         "operationId": "NodesController_createFolder",
@@ -1225,6 +1281,57 @@
           "folderCount",
           "fileCount",
           "totalSizeBytes"
+        ]
+      },
+      "SearchHitDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "dataRoomId": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "FOLDER",
+              "FILE"
+            ]
+          },
+          "name": {
+            "type": "string"
+          },
+          "updatedAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "sizeBytes": {
+            "type": "number",
+            "nullable": true
+          },
+          "mimeType": {
+            "type": "string",
+            "nullable": true
+          },
+          "parentId": {
+            "type": "string",
+            "nullable": true,
+            "description": "The folder this result sits in"
+          },
+          "parentName": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "id",
+          "dataRoomId",
+          "type",
+          "name",
+          "updatedAt",
+          "parentId",
+          "parentName"
         ]
       },
       "CreateFolderDto": {
