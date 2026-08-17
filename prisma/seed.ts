@@ -116,9 +116,11 @@ async function main(): Promise<void> {
     bytes: Uint8Array,
   ): Promise<string> => {
     const nodeId = randomUUID();
+    // The version's id doubles as the upload id in the real flow, and the storage key is
+    // built from it; the seed mirrors that so demo objects look like uploaded ones.
     const versionId = randomUUID();
     const path = buildChildPath(parent.path, nodeId);
-    const storageKey = buildStorageKey({ dataRoomId: room.id, nodeId, fileVersionId: versionId });
+    const storageKey = buildStorageKey({ dataRoomId: room.id, uploadIntentId: versionId });
 
     // Object first, row second. An unreferenced object is cheap and collectable; a row
     // pointing at bytes that were never stored is a broken file in the UI.

@@ -13,10 +13,19 @@ they bite.
 
 ## Signing rules
 
-- **Whatever you pass into the presign command becomes a signed header, and the browser must send it
-  byte-for-byte.** Include `ContentType` and the client must set exactly that value; a browser that sends
-  `application/pdf; charset=utf-8` against a signature for `application/pdf` fails. Return the exact
-  content type from the presign endpoint and have the client echo it back rather than deriving it again.
+- **Passing `ContentType` to the command does not sign it.** This is the opposite of what most
+  write-ups claim, and it is worth checking rather than believing: with the AWS SDK v3 presigner the
+  resulting URL carries `X-Amz-SignedHeaders=host`, and a PUT with *any* content type — or none —
+  succeeds. Verified by reading the query string of a signed URL and by uploading four different
+  content types against one signature, all accepted.
+
+  To actually bind it, opt in: `getSignedUrl(client, command, { expiresIn, signableHeaders: new
+  Set(['content-type']) })`. Then the client must send exactly the value the presign endpoint
+  returned — `application/pdf; charset=utf-8` against a signature for `application/pdf` fails — so
+  return that value and have the client echo it rather than deriving it again.
+
+  Decide deliberately which you want. Binding it is defence in depth, not a substitute for pinning
+  the type at read time: the stored content type came from the client either way.
 - **Do not sign `ContentLength`.** A one-byte difference between the declared and actual size invalidates
   the signature, and the browser is not the authority on the size anyway. Verify the real size after the
   fact with `HeadObject` and reject the completion if it disagrees with what was declared.

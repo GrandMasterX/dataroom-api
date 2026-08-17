@@ -103,6 +103,34 @@ const checks: Check[] = [
       HAVING max(version_number) <> count(*) OR min(version_number) <> 1`,
   },
   {
+    // Prisma cannot express these in schema.prisma, so it treats them as drift and every
+    // generated migration proposes dropping them. Removing that line by hand is easy to
+    // forget once; this check turns the silent regression into a failed run.
+    name: 'hand-written database objects still exist',
+    matters:
+      'a generated migration can drop the trigger, the partial indexes or the prefix-scan index, and nothing else would notice',
+    sql: `
+      SELECT expected AS sample FROM (VALUES
+        ('index:nodes_path_prefix_idx'), ('index:nodes_name_trgm_idx'),
+        ('index:nodes_single_root_key'), ('index:file_versions_one_current'),
+        ('index:share_links_one_active'),
+        ('trigger:nodes_set_name_ci_trg'),
+        ('check:nodes_name_ci_matches'), ('check:nodes_path_shape'), ('check:nodes_depth_bounds'),
+        ('default:nodes.updated_at'), ('default:data_rooms.updated_at')
+      ) AS required(expected)
+      WHERE expected NOT IN (
+        SELECT 'index:' || indexname FROM pg_indexes WHERE schemaname = 'public'
+        UNION ALL
+        SELECT 'trigger:' || tgname FROM pg_trigger WHERE NOT tgisinternal
+        UNION ALL
+        SELECT 'check:' || conname FROM pg_constraint WHERE contype = 'c'
+        UNION ALL
+        SELECT 'default:' || table_name || '.' || column_name
+        FROM information_schema.columns
+        WHERE table_schema = 'public' AND column_name = 'updated_at' AND column_default IS NOT NULL
+      )`,
+  },
+  {
     name: 'share targets belong to the recorded data room',
     matters: 'a mismatch makes the access check and the listing disagree about scope',
     sql: `

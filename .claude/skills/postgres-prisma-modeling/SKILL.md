@@ -111,6 +111,15 @@ aggregates and advisory locks. When you use it:
   does not lock a live table.
 - Never edit an applied migration. Add a new one — an edited migration is applied in one environment and
   not another, and the drift is invisible.
+- **Read every generated migration before applying it, specifically for statements you did not ask
+  for.** Anything hand-written that the schema file cannot express — a trigger, a partial or
+  expression index, a CHECK, a column default the ORM implements client-side — looks like drift to the
+  generator, so it proposes dropping it. A migration adding one nullable column arrived with
+  `DROP INDEX` for two indexes and `DROP DEFAULT` for two columns; applying it would have removed the
+  trigram search index and the prefix-scan index while every test stayed green.
+  Deleting those lines by hand works once. Make it survive the next time by asserting the objects
+  exist in the same check that audits data invariants, so a silent removal fails a run instead of
+  being discovered in production.
 
 ## Types at the boundary
 

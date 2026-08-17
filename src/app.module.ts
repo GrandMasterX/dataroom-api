@@ -11,6 +11,8 @@ import { DataRoomsModule } from './data-rooms/data-rooms.module';
 import { HealthModule } from './health/health.module';
 import { NodesModule } from './nodes/nodes.module';
 import { PrismaModule } from './prisma/prisma.module';
+import { StorageModule } from './storage/storage.module';
+import { UploadsModule } from './uploads/uploads.module';
 
 @Module({
   imports: [
@@ -32,6 +34,8 @@ import { PrismaModule } from './prisma/prisma.module';
     AuthModule,
     NodesModule,
     DataRoomsModule,
+    StorageModule,
+    UploadsModule,
     HealthModule,
   ],
   providers: [

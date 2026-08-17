@@ -149,7 +149,8 @@ model FileVersion {
   isCurrent  Boolean  @default(true) @map("is_current")
   sizeBytes  BigInt   @map("size_bytes")
   mimeType   String   @map("mime_type")
-  storageKey String   @unique @map("storage_key") // rooms/{roomId}/{nodeId}/{versionId}
+  // rooms/{roomId}/{uploadIntentId}; the version adopts the upload id, see storage-key.ts
+  storageKey String   @unique @map("storage_key")
   checksum   String? // ETag returned by S3
   createdById String   @map("created_by_id") @db.Uuid
   createdAt   DateTime @default(now()) @map("created_at")
@@ -208,7 +209,11 @@ model ShareGrant {
 model UploadIntent {
   id         String @id @default(uuid()) @db.Uuid
   dataRoomId String @map("data_room_id") @db.Uuid
-  parentId   String @map("parent_id") @db.Uuid
+  // Nullable with ON DELETE SET NULL rather than cascading: if the destination folder is
+  // deleted mid-upload, the intent must survive long enough to tell the user that the
+  // folder is gone. Cascading it away instead reports "upload not found", which is both
+  // confusing and indistinguishable from someone probing another user's upload id.
+  parentId   String? @map("parent_id") @db.Uuid
   // What was signed is what gets verified at completion. The client is not trusted.
   fileName     String    @map("file_name")
   mimeType     String    @map("mime_type")
@@ -224,7 +229,7 @@ model UploadIntent {
   createdAt       DateTime @default(now()) @map("created_at")
 
   dataRoom  DataRoom @relation(fields: [dataRoomId], references: [id], onDelete: Cascade)
-  parent    Node     @relation(fields: [parentId], references: [id], onDelete: Cascade)
+  parent    Node?    @relation(fields: [parentId], references: [id], onDelete: SetNull)
   createdBy User     @relation("upload_intent_created_by", fields: [createdById], references: [id], onDelete: Cascade)
 
   @@index([expiresAt]) // selects expired, unconsumed uploads for GC
