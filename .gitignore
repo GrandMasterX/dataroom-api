@@ -1,0 +1,11 @@
+node_modules/
+dist/
+.env
+.env.local
+*.log
+
+# The Prisma 7 client is generated into src/generated — a build artifact, not a source.
+src/generated/
+
+coverage/
+.DS_Store

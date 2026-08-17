@@ -1,0 +1,62 @@
+# Local dependencies of the API. The application itself runs on the host
+# (`pnpm start:dev`), not in this stack, and that is deliberate: a presigned URL
+# signed against the internal hostname `minio:9000` cannot be opened by a browser
+# on the host. With the API on the host both sides agree on localhost:9000.
+name: dataroom
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: dataroom
+      POSTGRES_PASSWORD: dataroom
+      POSTGRES_DB: dataroom
+    ports:
+      # Host port 5433 on purpose: 5432 is often taken by a system-wide or another
+      # project's Postgres, and this project should not require stopping those.
+      - "5433:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./docker/postgres/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U dataroom -d dataroom"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  minio:
+    image: minio/minio:latest
+    restart: unless-stopped
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
+    ports:
+      - "9000:9000" # S3 API
+      - "9001:9001" # web console: handy to confirm an object really landed
+    volumes:
+      - miniodata:/data
+    # `mc` and the preconfigured `local` alias ship with the image — verified by running it.
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  minio-init:
+    image: minio/mc:latest
+    depends_on:
+      minio:
+        condition: service_healthy
+    entrypoint: >
+      /bin/sh -c "
+      mc alias set local http://minio:9000 minioadmin minioadmin &&
+      mc mb --ignore-existing local/dataroom-dev &&
+      mc anonymous set none local/dataroom-dev &&
+      echo 'bucket dataroom-dev ready'
+      "
+
+volumes:
+  pgdata:
+  miniodata:

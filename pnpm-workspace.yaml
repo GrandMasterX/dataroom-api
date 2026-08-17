@@ -1,0 +1,14 @@
+# pnpm 10+ blocks dependency postinstall scripts by default. Without an explicit
+# allowance the native argon2 binding is not built and Prisma engines are not installed.
+#
+# This lives in the repository rather than in a local `pnpm approve-builds` so that
+# `pnpm install` behaves identically on every machine and in CI.
+# Since pnpm 11 the setting is read only from here — the "pnpm" field in package.json
+# is ignored.
+allowBuilds:
+  '@prisma/engines': true # query and migration engines
+  '@scarf/scarf': false # install analytics; the product does not need it
+  argon2: true # native binding for password hashing
+  esbuild: true # used by tsx for scripts and seeds
+  prisma: true # CLI
+  unrs-resolver: true # transitive dependency of the eslint toolchain

@@ -1,0 +1,247 @@
+// Data Room data model.
+//
+// Three decisions shape everything else:
+//  1. Folders and files live in ONE `nodes` table. Sharing targets "a data room, a
+//     folder or a file", and with a single tree that is one `node_id` FK instead of
+//     three nullable columns; breadcrumbs, move, delete and subtree totals then have
+//     one implementation instead of two.
+//  2. `parent_id` is the source of truth. `path` is a derived materialized path used
+//     for prefix scans. The guest access boundary is computed from `parent_id` via a
+//     recursive CTE, NOT from `path`: that way a bug in path maintenance stays a
+//     display defect instead of becoming privilege escalation.
+//  3. A data room's name is the name of its root node. There is deliberately no
+//     `data_rooms.name`: two columns holding one fact drift apart.
+
+generator client {
+  provider     = "prisma-client"
+  output       = "../src/generated/prisma"
+  moduleFormat = "cjs"
+}
+
+datasource db {
+  // Prisma 7 no longer accepts `url` here: the CLI/migration connection string lives
+  // in prisma.config.ts, and the runtime gets a driver adapter (@prisma/adapter-pg).
+  provider = "postgresql"
+}
+
+enum NodeType {
+  // Declaration order is the sort order in PostgreSQL. That makes "folders above
+  // files" a free property of the listing index instead of a CASE expression that no
+  // index can serve.
+  FOLDER
+  FILE
+
+  @@map("node_type")
+}
+
+enum ShareRole {
+  // Only VIEWER ships in the MVP. EDITOR is added as an enum value plus one row in the
+  // can(action, role) matrix — no table changes (see README, "How it scales").
+  VIEWER
+
+  @@map("share_role")
+}
+
+model User {
+  id           String   @id @default(uuid()) @db.Uuid
+  email        String   @unique // stored lower-case
+  passwordHash String   @map("password_hash")
+  displayName  String   @map("display_name")
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  dataRooms     DataRoom[]
+  refreshTokens RefreshToken[]
+  createdNodes  Node[]         @relation("node_created_by")
+  fileVersions  FileVersion[]  @relation("file_version_created_by")
+  uploadIntents UploadIntent[] @relation("upload_intent_created_by")
+
+  @@map("users")
+}
+
+model RefreshToken {
+  id        String    @id @default(uuid()) @db.Uuid
+  userId    String    @map("user_id") @db.Uuid
+  tokenHash String    @unique @map("token_hash") // sha256 of an opaque token
+  expiresAt DateTime  @map("expires_at")
+  revokedAt DateTime? @map("revoked_at")
+  // Rotation chain. Reuse of an already-replaced token is detected through it.
+  replacedById String?  @map("replaced_by_id") @db.Uuid
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("refresh_tokens")
+}
+
+model DataRoom {
+  id      String @id @default(uuid()) @db.Uuid
+  ownerId String @map("owner_id") @db.Uuid
+  // Nullable because the root node is created as the second step of the same
+  // transaction: room -> root node -> set the pointer. No circular FK arises.
+  rootNodeId String?  @unique @map("root_node_id") @db.Uuid
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
+
+  owner    User  @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  rootNode Node? @relation("data_room_root", fields: [rootNodeId], references: [id], onDelete: SetNull)
+  nodes    Node[] @relation("data_room_nodes")
+
+  shareLinks    ShareLink[]
+  shareGrants   ShareGrant[]
+  uploadIntents UploadIntent[]
+
+  @@index([ownerId, createdAt])
+  @@map("data_rooms")
+}
+
+model Node {
+  id String @id @default(uuid()) @db.Uuid
+  // Denormalized deliberately: it scopes the listing, search and prefix-scan indexes
+  // without joining up the ancestor chain.
+  dataRoomId String   @map("data_room_id") @db.Uuid
+  parentId   String?  @map("parent_id") @db.Uuid // NULL => the room's root node
+  type       NodeType
+  name       String
+  // Computed exclusively by a database trigger (lower(name)). The @default("") only
+  // lets Prisma omit the column on create; the value is always overwritten by the
+  // trigger. Reason: JS toLowerCase() and PG lower() disagree (reproduced with
+  // 'İSTANBUL.PDF'), and two owners of one column mean a 500 on a legitimate filename.
+  nameCi String @default("") @map("name_ci")
+  // '/{rootId}/{...}/{selfId}/'. The surrounding slashes are mandatory, otherwise the
+  // prefix '/a/b/' would also match '/a/bc/'. The shape is pinned by a CHECK.
+  path        String
+  depth       Int
+  createdById String   @map("created_by_id") @db.Uuid
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  dataRoom  DataRoom  @relation("data_room_nodes", fields: [dataRoomId], references: [id], onDelete: Cascade)
+  parent    Node?     @relation("node_tree", fields: [parentId], references: [id], onDelete: Cascade)
+  children  Node[]    @relation("node_tree")
+  createdBy User      @relation("node_created_by", fields: [createdById], references: [id], onDelete: Restrict)
+  rootOf    DataRoom? @relation("data_room_root")
+
+  versions      FileVersion[]
+  shareLinks    ShareLink[]
+  shareGrants   ShareGrant[]
+  uploadIntents UploadIntent[]
+
+  // Case-insensitive name uniqueness inside a folder, guaranteed by the database
+  // rather than by a check in application code. NULLs are not compared, so root nodes
+  // of different rooms do not collide; "one root per room" is a partial index in the
+  // migration.
+  @@unique([parentId, nameCi])
+  // Column order matches the listing ORDER BY, which turns keyset pagination into an
+  // index seek.
+  @@index([parentId, type, nameCi, id])
+  @@index([dataRoomId])
+  @@map("nodes")
+}
+
+model FileVersion {
+  id            String @id @default(uuid()) @db.Uuid
+  nodeId        String @map("node_id") @db.Uuid
+  versionNumber Int    @map("version_number")
+  // "Currentness" lives here rather than as a current_version_id column on nodes, so
+  // that nodes and file_versions have no circular FK. "At most one current version per
+  // file" is a partial unique index in the migration.
+  isCurrent  Boolean  @default(true) @map("is_current")
+  sizeBytes  BigInt   @map("size_bytes")
+  mimeType   String   @map("mime_type")
+  storageKey String   @unique @map("storage_key") // rooms/{roomId}/{nodeId}/{versionId}
+  checksum   String? // ETag returned by S3
+  createdById String   @map("created_by_id") @db.Uuid
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  node      Node @relation(fields: [nodeId], references: [id], onDelete: Cascade)
+  createdBy User @relation("file_version_created_by", fields: [createdById], references: [id], onDelete: Restrict)
+
+  @@unique([nodeId, versionNumber])
+  @@map("file_versions")
+}
+
+model ShareLink {
+  id         String @id @default(uuid()) @db.Uuid
+  nodeId     String @map("node_id") @db.Uuid
+  dataRoomId String @map("data_room_id") @db.Uuid
+  // Stored in the clear on purpose: the owner must be able to copy the link again
+  // after a page reload. Hashing would only protect against a database dump, which
+  // already exposes the documents themselves.
+  token       String    @unique
+  role        ShareRole @default(VIEWER)
+  expiresAt   DateTime? @map("expires_at")
+  revokedAt   DateTime? @map("revoked_at")
+  createdById String    @map("created_by_id") @db.Uuid
+  createdAt   DateTime  @default(now()) @map("created_at")
+
+  node     Node     @relation(fields: [nodeId], references: [id], onDelete: Cascade)
+  dataRoom DataRoom @relation(fields: [dataRoomId], references: [id], onDelete: Cascade)
+
+  @@index([nodeId])
+  @@map("share_links")
+}
+
+model ShareGrant {
+  id         String @id @default(uuid()) @db.Uuid
+  nodeId     String @map("node_id") @db.Uuid
+  dataRoomId String @map("data_room_id") @db.Uuid
+  // Access is granted to an email address, not to a user id: someone who has not
+  // registered yet can be invited, and there is no "link the grant to a user" step
+  // that could drift.
+  inviteeEmail String    @map("invitee_email") // lower-case
+  role         ShareRole @default(VIEWER)
+  revokedAt    DateTime? @map("revoked_at")
+  createdById  String    @map("created_by_id") @db.Uuid
+  createdAt    DateTime  @default(now()) @map("created_at")
+
+  node     Node     @relation(fields: [nodeId], references: [id], onDelete: Cascade)
+  dataRoom DataRoom @relation(fields: [dataRoomId], references: [id], onDelete: Cascade)
+
+  // Re-inviting is idempotent: it clears the revocation instead of creating a duplicate.
+  @@unique([nodeId, inviteeEmail])
+  // Hot path of access resolution: a user's grants within one data room.
+  @@index([dataRoomId, inviteeEmail])
+  @@map("share_grants")
+}
+
+model UploadIntent {
+  id         String @id @default(uuid()) @db.Uuid
+  dataRoomId String @map("data_room_id") @db.Uuid
+  parentId   String @map("parent_id") @db.Uuid
+  // What was signed is what gets verified at completion. The client is not trusted.
+  fileName     String    @map("file_name")
+  mimeType     String    @map("mime_type")
+  declaredSize BigInt    @map("declared_size")
+  storageKey   String    @unique @map("storage_key")
+  expiresAt    DateTime  @map("expires_at")
+  consumedAt   DateTime? @map("consumed_at")
+  // Without these two columns a repeated completion (flaky network) could not return
+  // the same response and would have to answer 409 for a successful upload.
+  resultNodeId    String?  @map("result_node_id") @db.Uuid
+  resultVersionId String?  @map("result_version_id") @db.Uuid
+  createdById     String   @map("created_by_id") @db.Uuid
+  createdAt       DateTime @default(now()) @map("created_at")
+
+  dataRoom  DataRoom @relation(fields: [dataRoomId], references: [id], onDelete: Cascade)
+  parent    Node     @relation(fields: [parentId], references: [id], onDelete: Cascade)
+  createdBy User     @relation("upload_intent_created_by", fields: [createdById], references: [id], onDelete: Cascade)
+
+  @@index([expiresAt]) // selects expired, unconsumed uploads for GC
+  @@map("upload_intents")
+}
+
+model PendingBlobDeletion {
+  id String @id @default(uuid()) @db.Uuid
+  // Keys are written in the SAME transaction as the node DELETE. Otherwise, if the
+  // process dies between the commit and DeleteObjects, the keys become undiscoverable
+  // (the file_versions rows are already gone) and a document the user deleted stays in
+  // the bucket forever.
+  storageKey String   @map("storage_key")
+  attempts   Int      @default(0)
+  lastError  String?  @map("last_error")
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  @@index([createdAt])
+  @@map("pending_blob_deletions")
+}
