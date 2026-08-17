@@ -1,5 +1,6 @@
 import { Body, Controller, Get, HttpCode, HttpStatus, Post } from '@nestjs/common';
 import { Throttle } from '@nestjs/throttler';
+import { AUTH_ATTEMPT_LIMIT, AUTH_ATTEMPT_WINDOW_MS } from '../common/guards/api-throttler.guard';
 import { ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { CurrentUser } from './access-context';
 import { RequireUser } from './access-context.guard';
@@ -14,11 +15,12 @@ import { LoginDto, RefreshDto, RegisterDto, SessionDto, UserDto } from './dto/au
  */
 @ApiTags('auth')
 @Controller('auth')
+// A stricter limit than the rest of the API, counted per email address by the global
+// throttler guard rather than per source IP.
+@Throttle({ default: { limit: AUTH_ATTEMPT_LIMIT, ttl: AUTH_ATTEMPT_WINDOW_MS } })
 export class AuthController {
   constructor(private readonly auth: AuthService) {}
 
-  // Tighter than the global limit: these are the endpoints worth guessing at.
-  @Throttle({ default: { limit: 10, ttl: 60_000 } })
   @Post('register')
   @ApiOperation({ summary: 'Create an account and start a session' })
   @ApiOkResponse({ type: SessionDto })
@@ -26,7 +28,6 @@ export class AuthController {
     return this.auth.register(dto);
   }
 
-  @Throttle({ default: { limit: 10, ttl: 60_000 } })
   @Post('login')
   @HttpCode(HttpStatus.OK)
   @ApiOkResponse({ type: SessionDto })

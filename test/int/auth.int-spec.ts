@@ -141,6 +141,46 @@ describe('auth', () => {
     });
   });
 
+  describe('rate limiting', () => {
+    let app: INestApplication;
+
+    beforeAll(async () => {
+      app = await createTestApp();
+    });
+    afterAll(async () => {
+      await app?.close();
+    });
+
+    const http = () => request(app.getHttpServer());
+
+    it('counts credential attempts per email address, not per caller', async () => {
+      // The distinction is the whole point. Every request reaches this API from the
+      // frontend's BFF, so one shared address means an IP-keyed limit would lock out all
+      // users at once while an attacker spreading guesses over many accounts stays under it.
+      //
+      // Mutation: drop the email branch from ApiThrottlerGuard.getTracker -> the second
+      // account is refused too, because both share the caller's address.
+      // Both halves hit the same handler on purpose: the throttler's key includes the
+      // handler, so comparing across two different endpoints would pass with any tracker
+      // and pin nothing.
+      const target = 'locked-out@example.com';
+
+      const attempts = await Promise.all(
+        Array.from({ length: 12 }, () =>
+          http().post('/auth/login').send({ email: target, password: 'wrong' }),
+        ),
+      );
+      expect(attempts.some((response) => response.status === 429)).toBe(true);
+
+      // Same endpoint, same caller, different address: must still be answered on its merits.
+      const other = await http()
+        .post('/auth/login')
+        .send({ email: 'unaffected@example.com', password: 'whatever' });
+      expect(other.status).toBe(401);
+      expect(other.body.error.code).toBe('INVALID_CREDENTIALS');
+    });
+  });
+
   describe('with no grace window', () => {
     let app: INestApplication;
 

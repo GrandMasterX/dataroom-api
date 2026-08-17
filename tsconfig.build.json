@@ -1,4 +1,11 @@
 {
   "extends": "./tsconfig.json",
-  "exclude": ["node_modules", "dist", "test", "**/*.spec.ts", "**/*.int-spec.ts"]
+  "compilerOptions": {
+    // The root tsconfig also covers prisma/ and scripts/ so `tsc --noEmit` typechecks them.
+    // Pinning rootDir here keeps the emitted layout flat (dist/main.js) rather than
+    // dist/src/main.js, which the start scripts and the Dockerfile depend on.
+    "rootDir": "src"
+  },
+  "include": ["src/**/*"],
+  "exclude": ["node_modules", "dist", "**/*.spec.ts", "**/*.int-spec.ts", "src/**/__tests__/**"]
 }

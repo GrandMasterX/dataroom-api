@@ -32,6 +32,12 @@ export interface AppConfig {
     readonly credentials?: { readonly accessKeyId: string; readonly secretAccessKey: string };
   };
 
+  readonly throttle: {
+    readonly windowSeconds: number;
+    /** Requests per window for ordinary endpoints. */
+    readonly limit: number;
+  };
+
   readonly uploadMaxBytes: number;
   readonly presignPutTtlSeconds: number;
   readonly presignGetTtlSeconds: number;
@@ -102,6 +108,11 @@ export function loadAppConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
       endpoint: env.S3_ENDPOINT?.trim() || undefined,
       forcePathStyle: env.S3_FORCE_PATH_STYLE?.trim() === 'true',
       credentials: s3Credentials(env, problems),
+    },
+
+    throttle: {
+      windowSeconds: positiveInt('THROTTLE_WINDOW_SECONDS', 60),
+      limit: positiveInt('THROTTLE_LIMIT', 300),
     },
 
     uploadMaxBytes: positiveInt('UPLOAD_MAX_BYTES', 52_428_800),
