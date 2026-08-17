@@ -30,13 +30,14 @@ export const AUTH_ATTEMPT_WINDOW_MS = 60_000;
  */
 @Injectable()
 export class ApiThrottlerGuard extends ThrottlerGuard {
-  protected override async getTracker(request: Request): Promise<string> {
+  // Returns a promise to match the base signature; nothing here is asynchronous.
+  protected override getTracker(request: Request): Promise<string> {
     const body = request.body as { email?: unknown } | undefined;
     const email = typeof body?.email === 'string' ? body.email.trim().toLowerCase() : '';
-    if (email) return `email:${email}`;
+    if (email) return Promise.resolve(`email:${email}`);
 
     const forwarded = request.headers['x-forwarded-for'];
     const clientIp = (Array.isArray(forwarded) ? forwarded[0] : forwarded)?.split(',')[0]?.trim();
-    return `ip:${clientIp ?? request.ip ?? 'unknown'}`;
+    return Promise.resolve(`ip:${clientIp ?? request.ip ?? 'unknown'}`);
   }
 }

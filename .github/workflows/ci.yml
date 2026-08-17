@@ -1,0 +1,88 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with: { version: 11 }
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      # The repository's own compose file, not a hand-written service definition. Running the
+      # thing developers run means CI also proves that file still works — and the Postgres
+      # image needs its 18+ data directory layout, which a copied service block would get
+      # wrong.
+      - name: Start Postgres and MinIO
+        run: docker compose up -d postgres minio minio-init
+
+      - name: Wait for the database
+        run: |
+          for _ in $(seq 1 60); do
+            docker compose exec -T postgres pg_isready -U dataroom -d dataroom && exit 0
+            sleep 1
+          done
+          echo "Postgres did not become ready" >&2
+          docker compose logs postgres
+          exit 1
+
+      - run: pnpm db:generate
+
+      - name: Apply migrations
+        run: |
+          pnpm exec prisma migrate deploy
+          DIRECT_URL=postgresql://dataroom:dataroom@localhost:5433/dataroom_test pnpm exec prisma migrate deploy
+        env:
+          DIRECT_URL: postgresql://dataroom:dataroom@localhost:5433/dataroom
+
+      - run: pnpm typecheck
+      - run: pnpm lint
+      - run: pnpm test
+
+      - name: Integration tests
+        run: pnpm test:int
+
+      # Half the schema's guarantees are hand-written DDL that Prisma cannot express, and a
+      # generated migration will happily propose dropping them. This is what turns that from
+      # a silent regression into a failed build.
+      - name: Verify database invariants
+        run: VERIFY_DATABASE_URL=postgresql://dataroom:dataroom@localhost:5433/dataroom_test pnpm db:verify
+
+      - run: pnpm build
+
+      # The document is the contract with the frontend repository. If it changed, it has to be
+      # committed, or the other side is generating types for an API that no longer exists.
+      - name: Check the OpenAPI document is current
+        run: |
+          pnpm openapi:emit
+          git diff --exit-code openapi.json || {
+            echo "openapi.json is out of date — run pnpm openapi:emit and commit the result." >&2
+            exit 1
+          }
+
+    env:
+      NODE_ENV: test
+      DATABASE_URL: postgresql://dataroom:dataroom@localhost:5433/dataroom
+      DIRECT_URL: postgresql://dataroom:dataroom@localhost:5433/dataroom
+      TEST_DATABASE_URL: postgresql://dataroom:dataroom@localhost:5433/dataroom_test
+      CORS_ORIGINS: http://localhost:3000
+      JWT_ACCESS_SECRET: ci-access-secret
+      S3_BUCKET: dataroom-dev
+      S3_REGION: eu-west-1
+      S3_ENDPOINT: http://localhost:9000
+      S3_FORCE_PATH_STYLE: 'true'
+      S3_ACCESS_KEY_ID: minioadmin
+      S3_SECRET_ACCESS_KEY: minioadmin

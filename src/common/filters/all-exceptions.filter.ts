@@ -119,7 +119,9 @@ export class AllExceptionsFilter implements ExceptionFilter {
           details: Array.isArray(messages) ? { fieldErrors: messages } : undefined,
         },
       },
-      logAsError: status >= HttpStatus.INTERNAL_SERVER_ERROR,
+      // Compared as a number: getStatus() returns a plain status code, and treating it as
+      // the enum type would be a claim the value does not carry.
+      logAsError: status >= 500,
     };
   }
 }
