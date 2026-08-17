@@ -48,6 +48,20 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
   }
 }
 
+/**
+ * Options for transactions that do real work: moving a subtree, deleting one, completing an
+ * upload.
+ *
+ * Prisma's defaults are five seconds to finish and two to acquire a connection, which is
+ * generous for a single insert and thin for a statement that rewrites thousands of rows while
+ * holding a room-wide advisory lock — especially on a cold database or a shared instance,
+ * where the failure is a P2028 the user reads as "it broke" rather than "it took too long".
+ *
+ * Deliberately not unbounded: a transaction that cannot finish in half a minute is stuck, and
+ * holding the lock longer would block every other write in that room.
+ */
+export const TREE_TRANSACTION_OPTIONS = { maxWait: 10_000, timeout: 30_000 } as const;
+
 /** The transaction-scoped client handed to callbacks by `$transaction`. */
 export type PrismaTransaction = Omit<
   PrismaClient,

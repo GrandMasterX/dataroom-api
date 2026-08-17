@@ -3,7 +3,11 @@ import { Inject, Injectable, Logger } from '@nestjs/common';
 import { DomainError } from '../common/errors/domain-error';
 import { APP_CONFIG, type AppConfig } from '../config/app-config';
 import { NodeTreeService, type NodeRow } from '../nodes/node-tree.service';
-import { PrismaService, type PrismaTransaction } from '../prisma/prisma.service';
+import {
+  PrismaService,
+  TREE_TRANSACTION_OPTIONS,
+  type PrismaTransaction,
+} from '../prisma/prisma.service';
 import { buildStorageKey } from '../storage/storage-key';
 import { StorageService } from '../storage/storage.service';
 import { SUPPORTED_MIME_TYPES } from './supported-types';
@@ -195,7 +199,7 @@ export class UploadsService {
       });
 
       return { node, versionNumber: version.versionNumber, sizeBytes: stored.sizeBytes };
-    });
+    }, TREE_TRANSACTION_OPTIONS);
 
     return {
       node: {

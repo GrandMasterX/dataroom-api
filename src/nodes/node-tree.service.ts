@@ -2,7 +2,11 @@ import { randomUUID } from 'node:crypto';
 import { Injectable } from '@nestjs/common';
 import { DomainError } from '../common/errors/domain-error';
 import { isUniqueViolation, UniqueIndex } from '../common/errors/prisma-error';
-import { PrismaService, type PrismaTransaction } from '../prisma/prisma.service';
+import {
+  PrismaService,
+  TREE_TRANSACTION_OPTIONS,
+  type PrismaTransaction,
+} from '../prisma/prisma.service';
 import { NAME_ATTEMPT_LIMIT, nameForAttempt, type ConflictStrategy } from './name-conflict';
 import {
   MAX_DEPTH,
@@ -259,7 +263,7 @@ export class NodeTreeService {
         WHERE data_room_id = ${fresh.dataRoomId}::uuid AND path LIKE ${`${fresh.path}%`}`;
 
       return this.requireNode(fresh.id, tx);
-    });
+    }, TREE_TRANSACTION_OPTIONS);
   }
 
   /**
@@ -292,7 +296,7 @@ export class NodeTreeService {
         WHERE data_room_id = ${node.dataRoomId}::uuid AND path LIKE ${prefix}`;
 
       return { deletedNodes, queuedObjects };
-    });
+    }, TREE_TRANSACTION_OPTIONS);
   }
 
   /**
