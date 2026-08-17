@@ -4,7 +4,12 @@
     // The root tsconfig also covers prisma/ and scripts/ so `tsc --noEmit` typechecks them.
     // Pinning rootDir here keeps the emitted layout flat (dist/main.js) rather than
     // dist/src/main.js, which the start scripts and the Dockerfile depend on.
-    "rootDir": "src"
+    "rootDir": "src",
+    // Inside dist on purpose. By default the incremental cache lands next to the config, so
+    // `rm -rf dist` clears the output while the cache still claims everything is emitted —
+    // and the next build produces a dist missing every unchanged file. Tests would stay
+    // green throughout, because they compile from source.
+    "tsBuildInfoFile": "dist/.tsbuildinfo"
   },
   "include": ["src/**/*"],
   "exclude": ["node_modules", "dist", "**/*.spec.ts", "**/*.int-spec.ts", "src/**/__tests__/**"]

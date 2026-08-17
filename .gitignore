@@ -9,3 +9,6 @@ src/generated/
 
 coverage/
 .DS_Store
+
+# Incremental build cache
+*.tsbuildinfo
