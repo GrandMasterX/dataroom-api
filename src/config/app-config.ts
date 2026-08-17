@@ -14,8 +14,7 @@ export interface AppConfig {
   readonly dbPoolMax: number;
 
   readonly jwtAccessSecret: string;
-  readonly jwtRefreshSecret: string;
-  readonly accessTokenTtl: string;
+  readonly accessTokenTtlSeconds: number;
   readonly refreshTokenTtlDays: number;
   readonly refreshRotationGraceSeconds: number;
 
@@ -93,8 +92,7 @@ export function loadAppConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
     dbPoolMax: positiveInt('DB_POOL_MAX', 10),
 
     jwtAccessSecret: required('JWT_ACCESS_SECRET'),
-    jwtRefreshSecret: required('JWT_REFRESH_SECRET'),
-    accessTokenTtl: env.ACCESS_TOKEN_TTL?.trim() || '15m',
+    accessTokenTtlSeconds: positiveInt('ACCESS_TOKEN_TTL_SECONDS', 900),
     refreshTokenTtlDays: positiveInt('REFRESH_TOKEN_TTL_DAYS', 7),
     refreshRotationGraceSeconds: positiveInt('REFRESH_ROTATION_GRACE_SECONDS', 10),
 

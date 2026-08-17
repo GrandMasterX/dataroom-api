@@ -86,6 +86,13 @@ aggregates and advisory locks. When you use it:
 
 - Always `Prisma.sql` / `$queryRaw` with parameters. String interpolation into SQL is an injection
   defect regardless of how internal the value looks.
+- **Cast every parameter that lands in an overloaded function or an enum comparison.** An untyped
+  parameter makes PostgreSQL pick an overload, and it can pick the wrong one silently. The case that
+  cost real debugging time: `substring(path FROM $1)` resolves to the *regex* form
+  `substring(string FROM pattern)`, which finds no match and returns **NULL** instead of raising —
+  so a subtree update wrote NULL into every row rather than failing. `substring(path FROM $1::int)`
+  is unambiguous. Enum comparisons need the same (`$1::node_type`), though those at least error
+  instead of returning nonsense.
 - Type the result explicitly; a raw query returns `unknown` shapes, and `bigint`/`Decimal` come back as
   JS types the rest of the code may not expect.
 - Leave a one-line comment saying which Prisma limitation forced it. Otherwise the next person
