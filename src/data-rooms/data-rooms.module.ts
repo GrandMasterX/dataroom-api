@@ -1,11 +1,11 @@
 import { Module } from '@nestjs/common';
 import { AccessModule } from '../access/access.module';
-import { NodesModule } from '../nodes/nodes.module';
+import { NodeTreeModule } from '../nodes/node-tree.module';
 import { DataRoomsController } from './data-rooms.controller';
 import { DataRoomsService } from './data-rooms.service';
 
 @Module({
-  imports: [NodesModule, AccessModule],
+  imports: [NodeTreeModule, AccessModule],
   controllers: [DataRoomsController],
   providers: [DataRoomsService],
   exports: [DataRoomsService],

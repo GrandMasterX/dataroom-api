@@ -1,0 +1,1724 @@
+{
+  "openapi": "3.0.0",
+  "paths": {
+    "/auth/register": {
+      "post": {
+        "operationId": "AuthController_register",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RegisterDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SessionDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Create an account and start a session",
+        "tags": [
+          "auth"
+        ]
+      }
+    },
+    "/auth/login": {
+      "post": {
+        "operationId": "AuthController_login",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LoginDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SessionDto"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "auth"
+        ]
+      }
+    },
+    "/auth/refresh": {
+      "post": {
+        "description": "Rotates the token. A token presented long after it was rotated is treated as reuse and ends every session for that user; presenting it within the grace window is treated as a concurrent refresh and simply issues a new pair.",
+        "operationId": "AuthController_refresh",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RefreshDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SessionDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Exchange a refresh token for a new pair",
+        "tags": [
+          "auth"
+        ]
+      }
+    },
+    "/auth/logout": {
+      "post": {
+        "operationId": "AuthController_logout",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RefreshDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "204": {
+            "description": ""
+          }
+        },
+        "summary": "Revoke a refresh token",
+        "tags": [
+          "auth"
+        ]
+      }
+    },
+    "/auth/me": {
+      "get": {
+        "operationId": "AuthController_me",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserDto"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "auth"
+        ]
+      }
+    },
+    "/nodes/{id}": {
+      "get": {
+        "operationId": "NodesController_detail",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NodeDetailDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Node metadata with breadcrumbs and what the caller may do",
+        "tags": [
+          "nodes"
+        ]
+      },
+      "patch": {
+        "operationId": "NodesController_rename",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RenameNodeDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NodeDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Rename. Renaming a data room’s root renames the room.",
+        "tags": [
+          "nodes"
+        ]
+      },
+      "delete": {
+        "description": "Storage objects are queued for removal in the same transaction and deleted afterwards.",
+        "operationId": "NodesController_remove",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Delete a node and everything under it",
+        "tags": [
+          "nodes"
+        ]
+      }
+    },
+    "/nodes/{id}/children": {
+      "get": {
+        "description": "Keyset pagination: pass the previous page’s cursor. Ordered folders first, then by name, case-insensitively.",
+        "operationId": "NodesController_children",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "cursor",
+            "required": false,
+            "in": "query",
+            "description": "Opaque cursor from the previous page",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 200,
+              "default": 50,
+              "type": "number"
+            }
+          },
+          {
+            "name": "type",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "FOLDER",
+                "FILE"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChildrenPageDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "One page of a folder’s contents",
+        "tags": [
+          "nodes"
+        ]
+      }
+    },
+    "/nodes/{id}/stats": {
+      "get": {
+        "description": "Used by the folder header and by the delete confirmation, so the warning states what will actually be removed.",
+        "operationId": "NodesController_stats",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SubtreeStatsDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Totals for everything under this node",
+        "tags": [
+          "nodes"
+        ]
+      }
+    },
+    "/nodes/folders": {
+      "post": {
+        "operationId": "NodesController_createFolder",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateFolderDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NodeDto"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "nodes"
+        ]
+      }
+    },
+    "/nodes/{id}/move": {
+      "post": {
+        "operationId": "NodesController_move",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MoveNodeDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NodeDto"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "nodes"
+        ]
+      }
+    },
+    "/data-rooms": {
+      "get": {
+        "operationId": "DataRoomsController_list",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/DataRoomDto"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "summary": "Data rooms owned by the caller",
+        "tags": [
+          "data-rooms"
+        ]
+      },
+      "post": {
+        "operationId": "DataRoomsController_create",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateDataRoomDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DataRoomDto"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "data-rooms"
+        ]
+      }
+    },
+    "/data-rooms/{id}": {
+      "get": {
+        "operationId": "DataRoomsController_get",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DataRoomDto"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "data-rooms"
+        ]
+      },
+      "patch": {
+        "description": "Renames the room’s root node, which is where the name lives.",
+        "operationId": "DataRoomsController_rename",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RenameNodeDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DataRoomDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Rename a data room",
+        "tags": [
+          "data-rooms"
+        ]
+      },
+      "delete": {
+        "description": "Runs through the same subtree deletion as any folder, so blobs are queued too.",
+        "operationId": "DataRoomsController_remove",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Delete a data room and everything in it",
+        "tags": [
+          "data-rooms"
+        ]
+      }
+    },
+    "/nodes/{id}/shares": {
+      "get": {
+        "operationId": "SharesController_list",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NodeSharesDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Who can currently see this item",
+        "tags": [
+          "shares"
+        ]
+      }
+    },
+    "/nodes/{id}/shares/link": {
+      "post": {
+        "description": "Idempotent: an item has at most one active link, so pressing share twice cannot leave a second URL that the owner never sees and cannot revoke.",
+        "operationId": "SharesController_createLink",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateShareLinkDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ShareLinkDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Create or return the public link for an item",
+        "tags": [
+          "shares"
+        ]
+      }
+    },
+    "/shares/links/{linkId}": {
+      "delete": {
+        "description": "Takes effect on the next request: access is re-resolved every time and never cached in a session.",
+        "operationId": "SharesController_revokeLink",
+        "parameters": [
+          {
+            "name": "linkId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": ""
+          }
+        },
+        "summary": "Revoke a public link",
+        "tags": [
+          "shares"
+        ]
+      }
+    },
+    "/nodes/{id}/shares/grants": {
+      "post": {
+        "description": "By email address, so someone who has not registered yet can be invited; access resolves when they sign in. Re-inviting a revoked person reinstates the same grant.",
+        "operationId": "SharesController_grant",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateShareGrantDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ShareGrantDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Give a specific person read access",
+        "tags": [
+          "shares"
+        ]
+      }
+    },
+    "/shares/grants/{grantId}": {
+      "delete": {
+        "operationId": "SharesController_revokeGrant",
+        "parameters": [
+          {
+            "name": "grantId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "shares"
+        ]
+      }
+    },
+    "/shared/{token}": {
+      "get": {
+        "description": "Public by design — the token is the credential. Answers only about the shared item: naming its data room or its ancestors would defeat truncating them everywhere else.",
+        "operationId": "SharesController_resolveLink",
+        "parameters": [
+          {
+            "name": "token",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SharedLinkContextDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "What a public link points at",
+        "tags": [
+          "shares"
+        ]
+      }
+    },
+    "/shared-with-me": {
+      "get": {
+        "operationId": "SharesController_sharedWithMe",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/SharedWithMeItemDto"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "summary": "Items other people have shared with the caller",
+        "tags": [
+          "shares"
+        ]
+      }
+    },
+    "/invites/{grantId}": {
+      "get": {
+        "description": "No email is sent by this service, so the owner copies a link and passes it on. It resolves only for the invited address.",
+        "operationId": "SharesController_invite",
+        "parameters": [
+          {
+            "name": "grantId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SharedWithMeItemDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Resolve an invitation link",
+        "tags": [
+          "shares"
+        ]
+      }
+    },
+    "/uploads/presign": {
+      "post": {
+        "description": "The browser then PUTs each file directly to storage, so bytes never pass through this API and upload throughput does not depend on it. Any name collisions are reported here, before the bytes are sent.",
+        "operationId": "UploadsController_presign",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PresignBatchDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PresignBatchResultDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Get signed URLs for a batch of files",
+        "tags": [
+          "uploads"
+        ]
+      }
+    },
+    "/uploads/complete": {
+      "post": {
+        "description": "Idempotent: repeating a completed upload returns the same result. A conflict does not consume the upload, so the client can answer differently without sending the bytes again.",
+        "operationId": "UploadsController_complete",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CompleteUploadDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UploadResultDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Register an uploaded object as a file",
+        "tags": [
+          "uploads"
+        ]
+      }
+    },
+    "/files/{nodeId}/preview-url": {
+      "get": {
+        "description": "Returns JSON rather than redirecting: the client knows when the URL expires and can fetch a new one before it does, and no proxy layer has to be taught to forward a Location header.",
+        "operationId": "FilesController_previewUrl",
+        "parameters": [
+          {
+            "name": "nodeId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PreviewUrlDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "A short-lived signed URL for viewing or downloading the current version",
+        "tags": [
+          "files"
+        ]
+      }
+    },
+    "/files/{nodeId}/versions": {
+      "get": {
+        "description": "Owners only. The history names the people who uploaded each version, which is internal information about the seller’s team rather than something a guest needs.",
+        "operationId": "FilesController_versions",
+        "parameters": [
+          {
+            "name": "nodeId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/FileVersionDto"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "summary": "Version history",
+        "tags": [
+          "files"
+        ]
+      }
+    },
+    "/healthz": {
+      "get": {
+        "operationId": "HealthController_check",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HealthResponse"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "health"
+        ]
+      }
+    }
+  },
+  "info": {
+    "title": "Data Room API",
+    "description": "Secure document repository for due diligence.",
+    "version": "0.1.0",
+    "contact": {}
+  },
+  "tags": [],
+  "servers": [],
+  "components": {
+    "securitySchemes": {
+      "bearer": {
+        "scheme": "bearer",
+        "bearerFormat": "JWT",
+        "type": "http"
+      }
+    },
+    "schemas": {
+      "RegisterDto": {
+        "type": "object",
+        "properties": {
+          "email": {
+            "type": "string",
+            "example": "dana@acme.com"
+          },
+          "password": {
+            "type": "string",
+            "example": "Password123!",
+            "minLength": 10
+          },
+          "displayName": {
+            "type": "string",
+            "example": "Dana Owner"
+          }
+        },
+        "required": [
+          "email",
+          "password",
+          "displayName"
+        ]
+      },
+      "UserDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "email": {
+            "type": "string"
+          },
+          "displayName": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "email",
+          "displayName"
+        ]
+      },
+      "SessionDto": {
+        "type": "object",
+        "properties": {
+          "user": {
+            "$ref": "#/components/schemas/UserDto"
+          },
+          "accessToken": {
+            "type": "string"
+          },
+          "refreshToken": {
+            "type": "string",
+            "description": "Store server-side; the browser never sees this directly."
+          },
+          "accessTokenExpiresInSeconds": {
+            "type": "number",
+            "description": "Seconds until the access token expires."
+          }
+        },
+        "required": [
+          "user",
+          "accessToken",
+          "refreshToken",
+          "accessTokenExpiresInSeconds"
+        ]
+      },
+      "LoginDto": {
+        "type": "object",
+        "properties": {
+          "email": {
+            "type": "string",
+            "example": "dana@acme.com"
+          },
+          "password": {
+            "type": "string",
+            "example": "Password123!"
+          }
+        },
+        "required": [
+          "email",
+          "password"
+        ]
+      },
+      "RefreshDto": {
+        "type": "object",
+        "properties": {
+          "refreshToken": {
+            "type": "string",
+            "description": "Opaque refresh token issued by login or a previous refresh"
+          }
+        },
+        "required": [
+          "refreshToken"
+        ]
+      },
+      "NodeDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "dataRoomId": {
+            "type": "string"
+          },
+          "parentId": {
+            "type": "string",
+            "nullable": true
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "FOLDER",
+              "FILE"
+            ]
+          },
+          "name": {
+            "type": "string"
+          },
+          "updatedAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "sizeBytes": {
+            "type": "number",
+            "nullable": true,
+            "description": "Current version size"
+          },
+          "mimeType": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "id",
+          "dataRoomId",
+          "parentId",
+          "type",
+          "name",
+          "updatedAt"
+        ]
+      },
+      "BreadcrumbDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name"
+        ]
+      },
+      "CapabilitiesDto": {
+        "type": "object",
+        "properties": {
+          "canCreate": {
+            "type": "boolean"
+          },
+          "canRename": {
+            "type": "boolean"
+          },
+          "canMove": {
+            "type": "boolean"
+          },
+          "canDelete": {
+            "type": "boolean"
+          },
+          "canUpload": {
+            "type": "boolean"
+          },
+          "canShare": {
+            "type": "boolean"
+          },
+          "canViewVersionHistory": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "canCreate",
+          "canRename",
+          "canMove",
+          "canDelete",
+          "canUpload",
+          "canShare",
+          "canViewVersionHistory"
+        ]
+      },
+      "NodeDetailDto": {
+        "type": "object",
+        "properties": {
+          "node": {
+            "$ref": "#/components/schemas/NodeDto"
+          },
+          "breadcrumbs": {
+            "description": "Root first; truncated for guests",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/BreadcrumbDto"
+            }
+          },
+          "capabilities": {
+            "$ref": "#/components/schemas/CapabilitiesDto"
+          }
+        },
+        "required": [
+          "node",
+          "breadcrumbs",
+          "capabilities"
+        ]
+      },
+      "ChildrenPageDto": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/NodeDto"
+            }
+          },
+          "nextCursor": {
+            "type": "string",
+            "description": "Absent when this is the last page"
+          }
+        },
+        "required": [
+          "items"
+        ]
+      },
+      "SubtreeStatsDto": {
+        "type": "object",
+        "properties": {
+          "folderCount": {
+            "type": "number"
+          },
+          "fileCount": {
+            "type": "number"
+          },
+          "totalSizeBytes": {
+            "type": "number",
+            "description": "Sum of current versions — the logical size"
+          }
+        },
+        "required": [
+          "folderCount",
+          "fileCount",
+          "totalSizeBytes"
+        ]
+      },
+      "CreateFolderDto": {
+        "type": "object",
+        "properties": {
+          "parentId": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string",
+            "example": "03 Legal"
+          },
+          "onConflict": {
+            "type": "string",
+            "enum": [
+              "fail",
+              "rename"
+            ],
+            "default": "fail",
+            "description": "\"fail\" reports a conflict so the UI can ask; \"rename\" keeps both by appending a counter."
+          }
+        },
+        "required": [
+          "parentId",
+          "name"
+        ]
+      },
+      "RenameNodeDto": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "onConflict": {
+            "type": "string",
+            "enum": [
+              "fail",
+              "rename"
+            ],
+            "default": "fail"
+          }
+        },
+        "required": [
+          "name"
+        ]
+      },
+      "MoveNodeDto": {
+        "type": "object",
+        "properties": {
+          "targetParentId": {
+            "type": "string"
+          },
+          "onConflict": {
+            "type": "string",
+            "enum": [
+              "fail",
+              "rename"
+            ],
+            "default": "fail"
+          }
+        },
+        "required": [
+          "targetParentId"
+        ]
+      },
+      "DataRoomDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string",
+            "description": "The name of the room’s root node"
+          },
+          "rootNodeId": {
+            "type": "string",
+            "description": "Open this node to browse the room"
+          },
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "updatedAt": {
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "rootNodeId",
+          "createdAt",
+          "updatedAt"
+        ]
+      },
+      "CreateDataRoomDto": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "example": "Project Beacon"
+          }
+        },
+        "required": [
+          "name"
+        ]
+      },
+      "ShareLinkDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "token": {
+            "type": "string",
+            "description": "Build the public URL as <app>/s/<token>"
+          },
+          "nodeId": {
+            "type": "string"
+          },
+          "expiresAt": {
+            "type": "string",
+            "nullable": true
+          },
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "token",
+          "nodeId",
+          "createdAt"
+        ]
+      },
+      "ShareGrantDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "nodeId": {
+            "type": "string"
+          },
+          "email": {
+            "type": "string"
+          },
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "nodeId",
+          "email",
+          "createdAt"
+        ]
+      },
+      "NodeSharesDto": {
+        "type": "object",
+        "properties": {
+          "link": {
+            "nullable": true,
+            "description": "At most one active link per item, so the interface has one thing to copy.",
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ShareLinkDto"
+              }
+            ]
+          },
+          "grants": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ShareGrantDto"
+            }
+          }
+        },
+        "required": [
+          "grants"
+        ]
+      },
+      "CreateShareLinkDto": {
+        "type": "object",
+        "properties": {
+          "expiresAt": {
+            "type": "string",
+            "description": "Optional expiry. Without one the link lives until it is revoked."
+          }
+        }
+      },
+      "CreateShareGrantDto": {
+        "type": "object",
+        "properties": {
+          "email": {
+            "type": "string",
+            "example": "counsel@beacon.com",
+            "description": "The invitee does not need an account yet: access is resolved by address when they sign in."
+          }
+        },
+        "required": [
+          "email"
+        ]
+      },
+      "SharedLinkContextDto": {
+        "type": "object",
+        "properties": {
+          "nodeId": {
+            "type": "string"
+          },
+          "nodeName": {
+            "type": "string"
+          },
+          "nodeType": {
+            "type": "string",
+            "enum": [
+              "FOLDER",
+              "FILE"
+            ]
+          }
+        },
+        "required": [
+          "nodeId",
+          "nodeName",
+          "nodeType"
+        ]
+      },
+      "SharedWithMeItemDto": {
+        "type": "object",
+        "properties": {
+          "nodeId": {
+            "type": "string"
+          },
+          "nodeName": {
+            "type": "string"
+          },
+          "nodeType": {
+            "type": "string",
+            "enum": [
+              "FOLDER",
+              "FILE"
+            ]
+          },
+          "dataRoomId": {
+            "type": "string"
+          },
+          "sharedBy": {
+            "type": "string",
+            "description": "Who shared it"
+          },
+          "sharedAt": {
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "required": [
+          "nodeId",
+          "nodeName",
+          "nodeType",
+          "dataRoomId",
+          "sharedBy",
+          "sharedAt"
+        ]
+      },
+      "PresignItemDto": {
+        "type": "object",
+        "properties": {
+          "fileName": {
+            "type": "string",
+            "example": "Q1 2026 Accounts.pdf"
+          },
+          "mimeType": {
+            "type": "string",
+            "example": "application/pdf"
+          },
+          "sizeBytes": {
+            "type": "number",
+            "description": "Declared size; verified against the stored object afterwards"
+          }
+        },
+        "required": [
+          "fileName",
+          "mimeType",
+          "sizeBytes"
+        ]
+      },
+      "PresignBatchDto": {
+        "type": "object",
+        "properties": {
+          "parentId": {
+            "type": "string"
+          },
+          "items": {
+            "description": "Batched deliberately: one request per file would collide with this API’s own rate limit the first time someone drags in a folder.",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PresignItemDto"
+            }
+          }
+        },
+        "required": [
+          "parentId",
+          "items"
+        ]
+      },
+      "UploadConflictDto": {
+        "type": "object",
+        "properties": {
+          "existingNodeId": {
+            "type": "string"
+          },
+          "existingType": {
+            "type": "string",
+            "enum": [
+              "FOLDER",
+              "FILE"
+            ],
+            "description": "A collision with a folder cannot be resolved by adding a version — the UI needs this to avoid offering a dead option."
+          },
+          "versionCount": {
+            "type": "number",
+            "description": "Versions the existing file already has"
+          }
+        },
+        "required": [
+          "existingNodeId",
+          "existingType",
+          "versionCount"
+        ]
+      },
+      "PresignedItemDto": {
+        "type": "object",
+        "properties": {
+          "intentId": {
+            "type": "string"
+          },
+          "uploadUrl": {
+            "type": "string"
+          },
+          "contentType": {
+            "type": "string",
+            "description": "Send exactly this Content-Type or the signature will not match"
+          },
+          "expiresAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "conflict": {
+            "description": "Advisory: reported before the bytes are sent so the user is asked first.",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/UploadConflictDto"
+              }
+            ]
+          }
+        },
+        "required": [
+          "intentId",
+          "uploadUrl",
+          "contentType",
+          "expiresAt"
+        ]
+      },
+      "PresignBatchResultDto": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PresignedItemDto"
+            }
+          }
+        },
+        "required": [
+          "items"
+        ]
+      },
+      "CompleteUploadDto": {
+        "type": "object",
+        "properties": {
+          "intentId": {
+            "type": "string"
+          },
+          "onConflict": {
+            "type": "string",
+            "enum": [
+              "fail",
+              "rename",
+              "newVersion"
+            ],
+            "default": "fail",
+            "description": "\"newVersion\" adds a version to the colliding file instead of creating a second one."
+          }
+        },
+        "required": [
+          "intentId"
+        ]
+      },
+      "UploadResultDto": {
+        "type": "object",
+        "properties": {
+          "node": {
+            "$ref": "#/components/schemas/NodeDto"
+          },
+          "versionNumber": {
+            "type": "number"
+          },
+          "sizeBytes": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "node",
+          "versionNumber",
+          "sizeBytes"
+        ]
+      },
+      "PreviewUrlDto": {
+        "type": "object",
+        "properties": {
+          "url": {
+            "type": "string",
+            "description": "Short-lived, signed; fetch a new one before it expires"
+          },
+          "expiresAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "disposition": {
+            "type": "string",
+            "enum": [
+              "inline",
+              "attachment"
+            ]
+          },
+          "fileName": {
+            "type": "string"
+          },
+          "mimeType": {
+            "type": "string"
+          },
+          "sizeBytes": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "url",
+          "expiresAt",
+          "disposition",
+          "fileName",
+          "mimeType",
+          "sizeBytes"
+        ]
+      },
+      "FileVersionDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "versionNumber": {
+            "type": "number"
+          },
+          "isCurrent": {
+            "type": "boolean"
+          },
+          "sizeBytes": {
+            "type": "number"
+          },
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "createdBy": {
+            "type": "string",
+            "description": "Who uploaded it — owners only"
+          }
+        },
+        "required": [
+          "id",
+          "versionNumber",
+          "isCurrent",
+          "sizeBytes",
+          "createdAt",
+          "createdBy"
+        ]
+      },
+      "HealthResponse": {
+        "type": "object",
+        "properties": {}
+      }
+    }
+  }
+}

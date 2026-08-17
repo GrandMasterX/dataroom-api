@@ -1,9 +1,9 @@
-import { Module, forwardRef } from '@nestjs/common';
-import { NodesModule } from '../nodes/nodes.module';
+import { Module } from '@nestjs/common';
+import { NodeTreeModule } from '../nodes/node-tree.module';
 import { AccessService } from './access.service';
 
 @Module({
-  imports: [forwardRef(() => NodesModule)],
+  imports: [NodeTreeModule],
   providers: [AccessService],
   exports: [AccessService],
 })

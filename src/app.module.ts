@@ -9,6 +9,7 @@ import { APP_CONFIG, type AppConfig } from './config/app-config';
 import { ConfigModule } from './config/config.module';
 import { DataRoomsModule } from './data-rooms/data-rooms.module';
 import { HealthModule } from './health/health.module';
+import { NodeTreeModule } from './nodes/node-tree.module';
 import { NodesModule } from './nodes/nodes.module';
 import { PrismaModule } from './prisma/prisma.module';
 import { SharesModule } from './shares/shares.module';
@@ -33,6 +34,7 @@ import { UploadsModule } from './uploads/uploads.module';
       }),
     }),
     AuthModule,
+    NodeTreeModule,
     NodesModule,
     DataRoomsModule,
     StorageModule,

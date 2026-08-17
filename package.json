@@ -25,7 +25,7 @@
     "typecheck": "tsc --noEmit",
     "test": "jest",
     "test:int": "jest --config jest.int.config.js --runInBand",
-    "openapi:emit": "tsx scripts/emit-openapi.ts",
+    "openapi:emit": "nest build && node dist/tools/emit-openapi.js",
     "gc:orphans": "tsx scripts/gc-orphans.ts"
   },
   "dependencies": {
