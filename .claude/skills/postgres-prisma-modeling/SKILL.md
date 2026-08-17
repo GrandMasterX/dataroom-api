@@ -44,7 +44,15 @@ sort.
 - Case-insensitive sorting and uniqueness use the stored `name_ci` column rather than `lower(name)` in
   the query, so Prisma can express both the index and the ordering.
 - Prefix scans over a materialized path need `text_pattern_ops`; the default operator class does not
-  serve `LIKE 'prefix%'` under non-C collations.
+  serve `LIKE 'prefix%'` under non-C collations. Two consequences, both verified by `EXPLAIN` on a
+  100k-row table, both counterintuitive enough that someone will "fix" them back:
+  - **The prefix must be a constant or a bound parameter, never a subquery.** `path LIKE $1` uses the
+    index (Postgres derives `~>=~` / `~<~` bounds from the value); `path LIKE (SELECT ...) || '%'`
+    cannot be turned into bounds and seq-scans. So read the row first, then pass its path as a
+    parameter — one extra round trip buys the index.
+  - **Do not "optimize" `LIKE` into hand-written `>=` / `<` bounds.** A `text_pattern_ops` index
+    implements the `~>=~` / `~<~` operator family, not the collation-aware `>=` / `<`, so the manual
+    version silently drops to a seq scan while looking more explicit.
 - Substring search uses a GIN trigram index (`pg_trgm`); scoping it with a leading equality column
   requires `btree_gin`. A trigram index on the whole table plus a filter afterwards reads far more than
   it must.

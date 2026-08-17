@@ -52,6 +52,13 @@ One envelope, one place that produces it:
 - Database errors are translated at that boundary: Prisma `P2002` (unique violation) → the domain
   conflict, `P2025` (not found) → not found. Letting a raw Prisma error escape leaks column and index
   names to the client.
+- `P2002` alone is not enough information: several different unique indexes can fire, and "name already
+  taken" must not be reported for a violated single-root or single-current-version index. With Prisma 7
+  and the pg driver adapter the violated index name is available on the error at
+  `meta.driverAdapterError.cause.originalMessage` (and the columns at
+  `meta.driverAdapterError.cause.constraint.fields`); the top-level `message` never names the index, so
+  branching on message text silently mislabels half the cases. Map index name → domain error in one
+  place.
 - The status for "you may not read this" is **404** (see the `dataroom-domain` skill for why); 403 is
   only for "you may read but not write". Pick the status in the domain error, not in the controller.
 

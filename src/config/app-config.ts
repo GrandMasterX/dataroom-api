@@ -25,6 +25,12 @@ export interface AppConfig {
     /** Set for MinIO; empty for real AWS S3, where the SDK derives the endpoint. */
     readonly endpoint?: string;
     readonly forcePathStyle: boolean;
+    /**
+     * Explicit keys, or undefined to let the SDK's provider chain resolve them (which
+     * is what an assumed IAM role needs). See s3-client.factory.ts for why these are
+     * not the standard AWS_* variable names.
+     */
+    readonly credentials?: { readonly accessKeyId: string; readonly secretAccessKey: string };
   };
 
   readonly uploadMaxBytes: number;
@@ -97,6 +103,7 @@ export function loadAppConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
       region: required('S3_REGION'),
       endpoint: env.S3_ENDPOINT?.trim() || undefined,
       forcePathStyle: env.S3_FORCE_PATH_STYLE?.trim() === 'true',
+      credentials: s3Credentials(env, problems),
     },
 
     uploadMaxBytes: positiveInt('UPLOAD_MAX_BYTES', 52_428_800),
@@ -112,4 +119,28 @@ export function loadAppConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
 
   if (problems.length > 0) throw new ConfigError(problems);
   return config;
+}
+
+/**
+ * Both keys or neither. A half-configured pair would silently fall through to the SDK's
+ * provider chain and could end up using whatever credentials the host happens to have —
+ * which, for a local run pointed at MinIO, could mean writing to a real S3 bucket.
+ */
+function s3Credentials(
+  env: NodeJS.ProcessEnv,
+  problems: string[],
+): AppConfig['s3']['credentials'] {
+  const accessKeyId = env.S3_ACCESS_KEY_ID?.trim();
+  const secretAccessKey = env.S3_SECRET_ACCESS_KEY?.trim();
+
+  if (accessKeyId && secretAccessKey) return { accessKeyId, secretAccessKey };
+  if (accessKeyId || secretAccessKey) {
+    problems.push('S3_ACCESS_KEY_ID and S3_SECRET_ACCESS_KEY must be set together, or both omitted');
+  }
+  // A local endpoint with no explicit keys means MinIO would be addressed with whatever
+  // ambient AWS credentials exist — a confusing failure at best.
+  if (!accessKeyId && !secretAccessKey && env.S3_ENDPOINT?.trim()) {
+    problems.push('S3_ACCESS_KEY_ID / S3_SECRET_ACCESS_KEY are required when S3_ENDPOINT is set');
+  }
+  return undefined;
 }
