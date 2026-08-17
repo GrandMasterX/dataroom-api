@@ -1,6 +1,7 @@
 import { Body, Controller, Delete, Get, Param, ParseUUIDPipe, Patch, Post, Query } from '@nestjs/common';
 import { ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { AccessService } from '../access/access.service';
+import { projectBreadcrumbs, projectNode } from '../access/project-for-access-root';
 import { Ctx, CurrentUser, type AccessContext } from '../auth/access-context';
 import { RequireUser } from '../auth/access-context.guard';
 import {
@@ -42,11 +43,12 @@ export class NodesController {
     @Param('id', ParseUUIDPipe) id: string,
     @Ctx() ctx: AccessContext,
   ): Promise<NodeDetailDto> {
-    const { node, role } = await this.access.requireRead(ctx, id);
+    const access = await this.access.requireRead(ctx, id);
     return {
-      node: toNodeDto(node),
-      breadcrumbs: await this.tree.breadcrumbs(node),
-      capabilities: toCapabilitiesDto(role),
+      // Projected, not raw: at the edge of a share the parent exists but must not be named.
+      node: projectNode(toNodeDto(access.node), access),
+      breadcrumbs: projectBreadcrumbs(await this.tree.breadcrumbs(access.node), access),
+      capabilities: toCapabilitiesDto(access.role),
     };
   }
 

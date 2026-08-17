@@ -11,6 +11,7 @@ import { DataRoomsModule } from './data-rooms/data-rooms.module';
 import { HealthModule } from './health/health.module';
 import { NodesModule } from './nodes/nodes.module';
 import { PrismaModule } from './prisma/prisma.module';
+import { SharesModule } from './shares/shares.module';
 import { StorageModule } from './storage/storage.module';
 import { UploadsModule } from './uploads/uploads.module';
 
@@ -35,6 +36,7 @@ import { UploadsModule } from './uploads/uploads.module';
     NodesModule,
     DataRoomsModule,
     StorageModule,
+    SharesModule,
     UploadsModule,
     HealthModule,
   ],
