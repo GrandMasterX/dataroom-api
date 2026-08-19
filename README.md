@@ -12,8 +12,40 @@ This is the main README for the project. The code lives in three repositories:
 | [dataroom-web](https://github.com/GrandMasterX/dataroom-web) | Next.js frontend and the proxy that keeps sessions in first-party cookies. |
 | [dataroom-infra](https://github.com/GrandMasterX/dataroom-infra) | Terraform for the S3 bucket and the application's AWS identity. |
 
-> **Deployed URLs and demo credentials** — filled in once the deployment step runs; the local
-> instructions below are complete and reproduce the whole product.
+---
+
+## Live instance
+
+| | |
+| --- | --- |
+| **App** | **https://dataroom-web-rosy.vercel.app** |
+| **API** | https://api-production-ee652.up.railway.app — the OpenAPI document the frontend is built against is browsable at [`/api/docs`](https://api-production-ee652.up.railway.app/api/docs) |
+
+Two demo accounts, password `Password123!` for both. The sign-in page also has a **Use the
+demo account** button, so nothing needs typing.
+
+| Account | What it is there to show |
+| --- | --- |
+| `owner@demo.dataroom` | Owns the "Acme Acquisition" room: the whole tree, uploads with progress, sharing controls, version history. |
+| `viewer@demo.dataroom` | The receiving end of a per-person grant — read-only, and only the "02 Financials" folder. |
+
+And a **public link**, which needs no account at all and is the fastest thing to try:
+[**/s/5907cbe5bd994de08fba2e5d0cdd6dc4**](https://dataroom-web-rosy.vercel.app/s/5907cbe5bd994de08fba2e5d0cdd6dc4).
+It shares one folder, "03 Legal". Everything above that folder answers 404 to this link — the
+room itself included — and the breadcrumbs start at the shared folder instead of revealing the
+path to it.
+
+> **The first request after the database has been idle is slower, and that is the free tier
+> rather than the code.** Neon suspends the database compute after a few minutes of
+> inactivity. Measured end to end against the deployed API: **0.86 s** for the first request
+> against **0.27 s** once warm — so roughly six tenths of a second of wake-up, once. The API
+> container itself does not sleep, so this is the only cold start there is. Nothing pings the
+> stack to hide it.
+
+Where it runs, and why the pieces sit where they do: the API in Amsterdam (Railway `ams`), the
+database in Frankfurt (Neon `aws-eu-central-1`), the bucket in Ireland (AWS `eu-west-1`). The
+API talks to the database on every request, so those two being close matters most; file bytes
+go between the browser and the bucket directly and never pass through the API at all.
 
 ---
 
@@ -363,9 +395,16 @@ One test was rewritten because the mutation *did not* turn it red: the rate-limi
 two different endpoints, and the limiter's key includes the handler, so it would have passed
 under the broken implementation too.
 
-**Known gap:** an intermittent failure has been observed twice across roughly twenty runs and
-could not be reproduced in nine consecutive attempts. Both sightings followed a source edit
-with the dev server running. It is recorded rather than explained away.
+**Known gap:** one integration test fails intermittently — `POST /data-rooms` in a `beforeEach`
+answers 404 instead of 201. What is established: it happened three times in twelve full runs
+while the machine was doing other work, and never in forty-six runs afterwards, including
+twenty under deliberate CPU load. It has never been seen when that suite runs on its own,
+only in a full run of all six. Adding any instrumentation to the failing line made it stop
+reproducing, which is itself evidence that it is a timing race rather than a logic error, and
+also why the cause is still unknown. Nothing in the request path can return 404 — the guard
+answers 401 and the service throws no not-found — so the leading suspicion is the suite's own
+truncate-between-cases harness rather than the endpoint. Recorded rather than explained away,
+and deliberately not "fixed" by a retry, which would hide it.
 
 ---
 
