@@ -290,4 +290,48 @@ describe('nodes over HTTP', () => {
         .expect(404);
     });
   });
+
+  describe('search', () => {
+    it('treats % and _ as characters the user typed, not as wildcards', async () => {
+      // Without escaping, the query goes straight into a LIKE pattern: "%%%" matches every
+      // name in the room and "a_c" matches "abc". That is wrong results dressed up as
+      // ranking, and it is the kind of thing nobody reports because it looks plausible.
+      //
+      // Mutation: drop escapeLikePattern from the search query -> the two zero-hit
+      // assertions below start returning every file and this fails.
+      const token = await signUp('searcher');
+      const auth = { Authorization: `Bearer ${token}` };
+      const room = await createRoom(token);
+
+      for (const name of ['Margin 100% target.pdf', 'Report_v1.pdf', 'Report XV1.pdf']) {
+        await http()
+          .post('/nodes/folders')
+          .set(auth)
+          .send({ parentId: room.rootNodeId, name })
+          .expect(201);
+      }
+
+      const find = async (query: string): Promise<string[]> => {
+        const response = await http()
+          .get(`/nodes/${room.rootNodeId}/search?q=${encodeURIComponent(query)}`)
+          .set(auth)
+          .expect(200);
+        return (response.body as { name: string }[]).map((hit) => hit.name).sort();
+      };
+
+      // A literal percent sign finds the one name that contains it...
+      expect(await find('100%')).toEqual(['Margin 100% target.pdf']);
+      // ...and a pattern of nothing but wildcards finds nothing, because no name contains
+      // three literal percent signs.
+      expect(await find('%%%')).toEqual([]);
+
+      // The underscore is the quieter half of the same bug: unescaped, it matches any single
+      // character, so this would also return "Report XV1.pdf".
+      expect(await find('Report_v1')).toEqual(['Report_v1.pdf']);
+      expect(await find('___')).toEqual([]);
+
+      // The counterweight: ordinary queries must still match.
+      expect(await find('report')).toEqual(['Report XV1.pdf', 'Report_v1.pdf']);
+    });
+  });
 });

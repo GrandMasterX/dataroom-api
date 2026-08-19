@@ -12,3 +12,17 @@ allowBuilds:
   esbuild: true # used by tsx for scripts and seeds
   prisma: true # CLI
   unrs-resolver: true # transitive dependency of the eslint toolchain
+
+# Both of these arrive transitively and both have a fix available, so the fix is taken here
+# rather than waiting for the direct dependency to bump its range.
+#
+#   js-yaml       <=5.2.1 — exponential parsing time on flow collections (GHSA-pm4m-ph32-ghv5).
+#                 Pulled in by @nestjs/swagger, which serialises the spec rather than parsing
+#                 anything a caller sends, so the reachable risk here is low; it is pinned
+#                 anyway because the fix is a patch release and costs nothing.
+#   deepmerge-ts  <8 — stack exhaustion on recursive object graphs (GHSA-ggr8-5vv4-36mx).
+#                 Reached only through @prisma/config while the CLI reads prisma.config.ts,
+#                 which is a file this repository controls, never request input.
+overrides:
+  js-yaml@<5.2.2: '>=5.2.3'
+  deepmerge-ts@<8.0.0: '>=8.0.1'

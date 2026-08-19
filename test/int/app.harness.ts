@@ -31,6 +31,13 @@ export async function createTestApp(
   app.useGlobalPipes(
     new ValidationPipe({ transform: true, whitelist: true, forbidNonWhitelisted: true }),
   );
-  await app.init();
+  // `listen`, not just `init`. Supertest binds a server itself when the one it is handed is
+  // not listening — and it does that per request, then tears it down. Thousands of ephemeral
+  // ports opened and closed in a few seconds is fine on an idle machine and starts producing
+  // `read ECONNRESET` when the machine is busy, which surfaces as a random test failing
+  // somewhere unrelated. Listening once per suite means supertest reuses this server.
+  //
+  // Port 0 lets the OS choose, so suites cannot collide with each other or with a dev server.
+  await app.listen(0);
   return app;
 }

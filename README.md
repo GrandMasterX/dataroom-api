@@ -1,16 +1,16 @@
-# Data Room
+# Data Room — API
 
-A virtual data room: an organised, private repository for the documents that change hands
-during due diligence. Folders nest, files upload with real progress, and any of the three —
-a room, a folder, a single file — can be shared read-only with a link or with named people.
+The backend of a virtual data room: an organised, private repository for the documents that
+change hands during due diligence. Folders nest, files upload straight to object storage, and
+any of the three — a room, a folder, a single file — can be shared read-only with a link or
+with named people.
 
-This is the main README for the project. The code lives in three repositories:
+NestJS, Prisma, PostgreSQL and S3. This README covers the API: how it is run, the decisions
+behind the data model and the access rules, and how each of them was verified.
 
-| Repository | Contents |
-| --- | --- |
-| **dataroom-api** (this one) | NestJS + Prisma + PostgreSQL + S3. Local stack in `docker-compose.yml`. |
-| [dataroom-web](https://github.com/GrandMasterX/dataroom-web) | Next.js frontend and the proxy that keeps sessions in first-party cookies. |
-| [dataroom-infra](https://github.com/GrandMasterX/dataroom-infra) | Terraform for the S3 bucket and the application's AWS identity. |
+Related repositories, each documented on its own: the interface in
+[dataroom-web](https://github.com/GrandMasterX/dataroom-web) and the AWS infrastructure in
+[dataroom-infra](https://github.com/GrandMasterX/dataroom-infra).
 
 ---
 
@@ -51,29 +51,25 @@ go between the browser and the bucket directly and never pass through the API at
 
 ## Running it locally
 
-Requires Docker, Node 22 and pnpm. Nothing else — no AWS account, no cloud services.
+Requires Docker, Node 22 and pnpm. Nothing else — no AWS account, no cloud services: the
+local stack stands in for both, with MinIO speaking the same S3 API.
 
 ```bash
-# 1. API
-git clone https://github.com/GrandMasterX/dataroom-api && cd dataroom-api
 pnpm install
 cp .env.example .env          # works as-is against the local stack
 docker compose up -d          # PostgreSQL 18 and MinIO, plus the bucket
 pnpm db:migrate               # schema, triggers, constraints, indexes
 pnpm db:seed                  # two accounts, a data room with documents, both share modes
 pnpm start:dev                # http://localhost:4000 — API docs at /api/docs
-
-# 2. Web, in a second terminal
-git clone https://github.com/GrandMasterX/dataroom-web && cd dataroom-web
-pnpm install
-cp .env.example .env.local
-pnpm dev                      # http://localhost:3000
 ```
 
-The seed prints the credentials it created; the sign-in page also has a **Use the demo
-account** button. It seeds one owner, one invited viewer, a nested folder structure with real
-PDFs, one active public link and one per-person grant, so both sharing modes are visible
-immediately.
+The seed prints the credentials it created: one owner, one invited viewer, a nested folder
+structure with real PDFs, one active public link and one per-person grant, so both sharing
+modes are exercisable immediately.
+
+That is enough to use the whole API from `/api/docs`. To drive it through the interface as
+well, run [dataroom-web](https://github.com/GrandMasterX/dataroom-web) alongside it — its
+README covers that side.
 
 Useful commands:
 
@@ -395,16 +391,25 @@ One test was rewritten because the mutation *did not* turn it red: the rate-limi
 two different endpoints, and the limiter's key includes the handler, so it would have passed
 under the broken implementation too.
 
-**Known gap:** one integration test fails intermittently — `POST /data-rooms` in a `beforeEach`
-answers 404 instead of 201. What is established: it happened three times in twelve full runs
-while the machine was doing other work, and never in forty-six runs afterwards, including
-twenty under deliberate CPU load. It has never been seen when that suite runs on its own,
-only in a full run of all six. Adding any instrumentation to the failing line made it stop
-reproducing, which is itself evidence that it is a timing race rather than a logic error, and
-also why the cause is still unknown. Nothing in the request path can return 404 — the guard
-answers 401 and the service throws no not-found — so the leading suspicion is the suite's own
-truncate-between-cases harness rather than the endpoint. Recorded rather than explained away,
-and deliberately not "fixed" by a retry, which would hide it.
+**An intermittent failure, and what it turned out to be.** For a while a different
+integration test would fail on roughly one full run in four, always with something like
+`expected 201 "Created", got 404 "Not Found"`, and never when its own suite ran alone. Nothing
+in the request path can answer 404 there — the guard answers 401 and the service throws no
+not-found — so the endpoint was never a plausible culprit.
+
+Two things made it findable. Running the suite next to a heavy build reproduced it on demand,
+where an idle machine had hidden it for forty-six consecutive runs. And once reproducible, a
+failure finally surfaced as `read ECONNRESET`, which named the layer: transport, not domain.
+
+The cause was in the harness. It called `app.init()` but never `listen`, and Supertest binds a
+server itself when handed one that is not listening — per request, then tears it down.
+Thousands of ephemeral ports opened and closed in a few seconds is fine until the machine is
+busy, at which point requests start landing on a socket that is going away. `app.listen(0)`
+once per suite fixed it: ten runs under the same load, all green, and putting `app.init()`
+back brought the same 404 straight back.
+
+Worth recording because the obvious response — retrying the flaky test — would have buried a
+real defect in the test harness under a green tick.
 
 ---
 
@@ -425,8 +430,8 @@ works.
 This project was built with Claude Code, and the useful summary is not "AI wrote it" but which
 parts benefited and which needed pushing back on.
 
-**What it did well.** Scaffolding and mechanical work — modules, DTOs, forms, Tailwind
-markup — went quickly. Reviewing its own plan adversarially was productive: a review pass
+**What it did well.** Scaffolding and mechanical work — modules, DTOs, controllers,
+migrations — went quickly. Reviewing its own plan adversarially was productive: a review pass
 before any code existed found that the schema sketch declared no relations at all, which would
 have produced a database with no foreign keys and a delete that silently orphaned subtrees.
 
@@ -440,8 +445,10 @@ false and were only caught by running things:
   aborts the whole transaction; the mechanism was replaced.
 - "The alpine Postgres image initialises with the C locale" — it does not, but the underlying
   concern was real for a different reason, found by testing actual inputs.
-- A sandboxed iframe for the PDF viewer looked like free hardening and broke the entire
-  document view in Chrome.
+- "Unescaped user text in a LIKE pattern is only a correctness issue" — half right. Probing
+  the deployed search with `%%%` returned every name in the room; probing it again with a
+  share token confirmed the access boundary held, which is what turned a suspected leak into
+  a bug with a known blast radius. Both the fix and a test pinning either direction followed.
 
 The working method that produced those corrections: verify by execution rather than by
 reading, and prove a test fails when the code is broken before trusting it. Both are why the

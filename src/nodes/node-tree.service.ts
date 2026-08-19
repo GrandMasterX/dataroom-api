@@ -408,7 +408,7 @@ export class NodeTreeService {
       WHERE n.data_room_id = ${params.node.dataRoomId}::uuid
         AND n.path LIKE ${`${params.node.path}%`}
         AND n.id <> ${params.node.id}::uuid
-        AND n.name_ci LIKE '%' || lower(${params.query}) || '%'
+        AND n.name_ci LIKE '%' || lower(${escapeLikePattern(params.query)}) || '%' ESCAPE '\\'
       ORDER BY n.type, n.name_ci, n.id
       LIMIT ${Math.min(Math.max(params.limit, 1), 50)}`;
 
@@ -603,4 +603,19 @@ function decodeCursor(raw: string): Cursor {
     // which would look like an infinite list.
     throw DomainError.notFound('Invalid pagination cursor');
   }
+}
+
+/**
+ * Makes a user's search text mean itself inside a LIKE pattern.
+ *
+ * `%` and `_` are wildcards there, so without this a search for "100%" matches every name in
+ * the room and "report_v1" matches "reportXv1" — wrong results that look like a ranking quirk
+ * rather than a bug. It is not a way around the access boundary: the pattern is only ever
+ * applied to rows the surrounding query has already restricted to the caller's subtree.
+ *
+ * The backslash is replaced first. Doing it last would escape the backslashes this function
+ * had just introduced.
+ */
+function escapeLikePattern(value: string): string {
+  return value.replace(/[\\%_]/g, (character) => `\\${character}`);
 }
