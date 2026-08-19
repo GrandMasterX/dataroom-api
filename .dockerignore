@@ -1,0 +1,18 @@
+# Everything the image does not need. Keeping node_modules out is not only about size:
+# the host's tree is built for darwin-arm64, and copying it in would shadow the musl
+# build that the image installs for argon2.
+node_modules
+dist
+.git
+.github
+.claude
+coverage
+*.tsbuildinfo
+.env
+.env.*
+!.env.example
+docker-compose.yml
+docker/
+test/
+README.md
+openapi.json

@@ -2,15 +2,15 @@
   "name": "dataroom-api",
   "version": "0.1.0",
   "private": true,
-  "description": "Data Room API — NestJS + Prisma + PostgreSQL + S3",
+  "description": "Data Room API \u2014 NestJS + Prisma + PostgreSQL + S3",
   "engines": {
     "node": ">=22"
   },
+  "packageManager": "pnpm@11.22.0",
   "scripts": {
     "build": "nest build",
     "start": "node dist/main.js",
     "start:dev": "nest start --watch",
-    "start:prod": "prisma migrate deploy && node dist/main.js",
     "db:generate": "prisma generate",
     "db:migrate": "tsx prisma/migrate-all.ts",
     "db:deploy": "prisma migrate deploy",
@@ -49,6 +49,7 @@
     "nestjs-pino": "^4.6.1",
     "pg": "^8.16.3",
     "pino-http": "^10.5.0",
+    "prisma": "^7.9.1",
     "reflect-metadata": "^0.2.2",
     "rxjs": "^7.8.2"
   },
@@ -67,7 +68,6 @@
     "pdf-lib": "^1.17.1",
     "pino-pretty": "^13.1.2",
     "prettier": "^3.6.2",
-    "prisma": "^7.9.1",
     "supertest": "^7.1.4",
     "ts-jest": "^29.4.4",
     "tsx": "^4.20.6",
